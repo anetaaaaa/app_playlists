@@ -241,10 +241,12 @@
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const selectedPlaylist = document.getElementById('playlistDropdown').value;
 
             canvas.toBlob(async function(blob) {
                 const formData = new FormData();
                 formData.append('file', blob, 'capture.jpg');
+                formData.append('playlist', selectedPlaylist);
 
                 const response = await fetch('/predict', {
                     method: 'POST',
