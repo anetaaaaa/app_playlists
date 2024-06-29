@@ -1,0 +1,8 @@
+flask
+matplotlib.pyplot
+opencv-python
+base64
+numpy
+pandas
+tensorflow
+requests
