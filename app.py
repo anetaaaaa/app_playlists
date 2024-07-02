@@ -28,7 +28,7 @@ os.chdir(script_dir)
 
 # Load models
 ResNet50V2_Model = tf.keras.models.load_model('ResNet50V2_Model.h5')
-keras_model = load_model('pls_work.h5')
+keras_model = load_model('mood_model.h5')
 
 # Define the Flask app
 app = Flask(__name__, static_url_path='/static')
