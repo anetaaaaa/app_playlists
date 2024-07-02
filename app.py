@@ -50,18 +50,17 @@ sp_oauth = SpotifyOAuth(client_id=SPOTIFY_CLIENT_ID,
                         redirect_uri=URI,
                         scope=SCOPE)
 
-# Get Spotify access token and refresh if expired
 def get_spotify_token():
-    token_info = session.get('token_info', None)
-    
-    if not token_info:
-        return None
-
-    if spotipy.oauth2.is_token_expired(token_info):
-        token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
-        session['token_info'] = token_info
-    
-    return token_info['access_token']
+    auth_url = 'https://accounts.spotify.com/api/token'
+    auth_header = {
+        'Authorization': 'Basic ' + base64.b64encode((SPOTIFY_CLIENT_ID + ':' + SPOTIFY_CLIENT_SECRET).encode()).decode('utf-8'),
+    }
+    auth_data = {
+        'grant_type': 'client_credentials',
+    }
+    response = requests.post(auth_url, headers=auth_header, data=auth_data)
+    response_data = response.json()
+    return response_data['access_token']
 
 # Function to search for songs on Spotify
 def search_spotify(song_name, token):
@@ -83,9 +82,7 @@ def search_spotify(song_name, token):
 
 # Function to get user's playlists
 def get_user_playlists(username):
-    token = get_spotify_token()
-    sp = spotipy.Spotify(auth=token)
-    playlists = sp.user_playlists(username)
+    playlists = sp_oauth.user_playlists(username)
     playlist_names = [playlist['name'] for playlist in playlists['items']]
     return playlist_names
 
@@ -122,32 +119,29 @@ def get_track_info(track_name):
     return track_info
 
 def create_playlist_dataframe(playlist_name):
-    token = get_spotify_token()
-    # Search for playlists by name
-    if token:
-        sp = spotipy.Spotify(auth=token)
-        playlists = sp.search(q=playlist_name, type='playlist')
-    # Check if any playlists were found
-        if playlists['playlists']['items']:
-            # Get the first playlist found (you can enhance this logic if needed)
-            playlist = playlists['playlists']['items'][0]
 
-            # Get tracks from the playlist
-            results = sp.playlist_tracks(playlist['id'])
+    playlists = spotify.search(q=playlist_name, type='playlist')
+    # Check if any playlists were found
+    if playlists['playlists']['items']:
+        # Get the first playlist found (you can enhance this logic if needed)
+        playlist = playlists['playlists']['items'][0]
+
+        # Get tracks from the playlist
+        results = spotify.playlist_tracks(playlist['id'])
 
             # Initialize an empty list to collect track information
-            all_tracks_info = []
+        all_tracks_info = []
 
             # Iterate over tracks in the playlist
-            for track in results['items']:
-                track_name = track['track']['name']
-                track_info = get_track_info(track_name)
-                all_tracks_info.extend(track_info)
+        for track in results['items']:
+            track_name = track['track']['name']
+            track_info = get_track_info(track_name)
+            all_tracks_info.extend(track_info)
 
             # Create a DataFrame from the collected track information
-            df = pd.DataFrame(all_tracks_info)
-            df.set_index('name', inplace=True)  # Set index on track name
-            return df
+        df = pd.DataFrame(all_tracks_info)
+        df.set_index('name', inplace=True)  # Set index on track name
+        return df
     else:
         return None
 
@@ -278,11 +272,8 @@ def check_auth():
     
 @app.route('/user_playlists', methods=['GET'])
 def user_playlists():
-    token = get_spotify_token()
-    print(spotipy.oauth2.is_token_expired(token)) 
-    if token:
-        sp = spotipy.Spotify(auth=token)
-        playlists = sp.current_user_playlists(limit=50)
+    if spotify:
+        playlists = spotify.current_user_playlists(limit=50)
         playlist_names = [playlist['name'] for playlist in playlists['items']]
         return jsonify(playlist_names)
     else:
@@ -294,13 +285,18 @@ def login():
     username = request.form.get('username')
     scope = request.form.get('scope')
     redirect_uri = request.form.get('redirect_uri')
-    
-    token = util.prompt_for_user_token(username, scope=scope,
+    global token 
+    token = util.prompt_for_user_token(username=username, scope=scope,
                                        client_id=SPOTIFY_CLIENT_ID,
                                        client_secret=SPOTIFY_CLIENT_SECRET,
                                        redirect_uri=redirect_uri)
+    print(token)
+    global cache_token 
+    cache_token = token.get_access_token()
+    global spotify
+    spotify = spotipy.Spotify(cache_token)
 
-    print(spotipy.oauth2.is_token_expired(token)) 
+    print(sp_oauth.is_token_expired(token)) 
     if token:
         session['spotify_token'] = token
         session['spotify_username'] = 'anetgirl'
