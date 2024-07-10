@@ -2,7 +2,9 @@
 
 Model for emotion recognition from kaggle: (https://www.kaggle.com/code/abduulrahmankhalid/emotion-based-music-recommender-resnet50v2/notebook).
 
-Model for mood recognition for songs from: (https://mikemoschitto.medium.com/deep-learning-and-music-mood-classification-of-spotify-songs-b2dda2bf455)
+Pre-trained model ResNet50V2 trained on the ImageNet dataset: https://github.com/keras-team/keras/blob/v3.3.3/keras/src/applications/resnet_v2.py#L6
+
+Model for mood recognition based on: (https://github.com/michaelmoschitto/AISongRecommender)
 
 This is a web interface implemented on [Python](https://www.python.org) that uses a model to recognize emotion and recommend songs from Spotify.
 

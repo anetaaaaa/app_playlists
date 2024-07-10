@@ -8,11 +8,9 @@ import os
 import matplotlib.pyplot as plt
 import io
 import spotipy
-import spotipy.util as util
 from spotipy.oauth2 import SpotifyOAuth
 from sklearn.preprocessing import MinMaxScaler
 from keras.models import load_model
-from spotipy.oauth2 import SpotifyClientCredentials
 from config import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SCOPE, URI, SECRET_KEY
 import requests
 
@@ -44,33 +42,19 @@ reverse_mood_encoding = {
     3: 'sad'
 }
 
-# Function to get Spotify access token using refresh token
-def get_spotify_token():
-    auth_url = 'https://accounts.spotify.com/api/token'
-    auth_header = {
-        'Authorization': 'Basic ' + base64.b64encode((SPOTIFY_CLIENT_ID + ':' + SPOTIFY_CLIENT_SECRET).encode()).decode('utf-8'),
-    }
-    auth_data = {
-        'grant_type': 'client_credentials',
-    }
-    response = requests.post(auth_url, headers=auth_header, data=auth_data)
-    response_data = response.json()
-    return response_data['access_token']
+sp_oauth = SpotifyOAuth(client_id=SPOTIFY_CLIENT_ID, client_secret=SPOTIFY_CLIENT_SECRET, redirect_uri=URI, scope=SCOPE)
 
 # Function to refresh Spotify token if expired
 def refresh_spotify_token():
-    token_info = None
-    if 'spotify_token' in session:
-        token_info = session['spotify_token']
-    else:
-        sp_oauth = SpotifyOAuth(client_id=SPOTIFY_CLIENT_ID,
-                                client_secret=SPOTIFY_CLIENT_SECRET,
-                                redirect_uri=URI,
-                                scope=SCOPE)
-        if sp_oauth.is_token_expired(token_info):
-            token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
-            session['spotify_token'] = token_info
+    token_info = session.get("token_info", None)
+    if not token_info:
+        return redirect("/login")
+    
+    if sp_oauth.is_token_expired(token_info):
+        token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
+        session['token_info'] = token_info
     return token_info
+
 
 # Function to search for songs on Spotify
 def search_spotify(song_name, token):
@@ -90,23 +74,13 @@ def search_spotify(song_name, token):
     else:
         return None
 
-# Function to get user's playlists
-def get_user_playlists(username):
-    refresh_spotify_token()
-    token = session['spotify_token']
-    if token:
-        sp = spotipy.Spotify(auth=token)
-        playlists = sp.user_playlists(username)
-        playlist_names = [playlist['name'] for playlist in playlists['items']]
-        return playlist_names
-    else:
-        return None
-
 # Function to get track data for mood recognition
 def get_track_info(track_name):
-    refresh_spotify_token()
-    if 'spotify_token' in session:
-        sp = spotipy.Spotify(auth=session['spotify_token'])
+    token_info = session.get("token_info", None)
+    if not token_info:
+        return redirect("/login")
+    else:
+        sp = spotipy.Spotify(auth=token_info["access_token"])
         results = sp.search(q=track_name, limit=1)
         track_info = []
 
@@ -131,14 +105,15 @@ def get_track_info(track_name):
             })
 
         return track_info
-    else:
-        print("token not in session - def get_track_info()")
 
 # Function to create playlist dataframe
 def create_playlist_dataframe(playlist_name):
-    refresh_spotify_token()
-    if 'spotify_token' in session:
-        sp = spotipy.Spotify(auth=session['spotify_token'])
+    token_info = session.get("token_info", None)
+    if not token_info:
+        return redirect("/login")
+    else:
+        sp = spotipy.Spotify(auth=token_info["access_token"])
+        print(token_info["access_token"])
         playlists = sp.search(q=playlist_name, type='playlist')
 
         if playlists['playlists']['items']:
@@ -153,10 +128,11 @@ def create_playlist_dataframe(playlist_name):
 
             df = pd.DataFrame(all_tracks_info)
             df.set_index('name', inplace=True)
-            return df
-    else:
-        print('Token not in session - def create_playlist_dataframe')
-
+            if (len(df)>0):
+                return df
+            else:
+                return("Something went wrong")
+            
 # Function to predict mood for track
 def predict_mood_for_tracks(df):
     scaler = MinMaxScaler()
@@ -169,30 +145,28 @@ def predict_mood_for_tracks(df):
 
 # Function to recommend songs to boost the mood
 def Recommend_Songs(pred_class, Music_Player):
-    if pred_class in ['Happy', 'Sad']:
+    if pred_class in ['Neutral', 'Sad']:
         Play = Music_Player[Music_Player['mood'].isin(['happy', 'energetic'])]
-    elif pred_class in ['Fear', 'Angry']:
+    elif pred_class in ['Fear', 'Angry', 'Disgust', 'Surprise']:
         Play = Music_Player[Music_Player['mood'] == 'calm']
-    elif pred_class in ['Surprise', 'Neutral']:
+    elif pred_class in ['Happy']:
         Play = Music_Player[Music_Player['mood'] == 'energetic']
-    elif pred_class == 'Disgust':
-        Play = Music_Player[Music_Player['mood'] == 'happy']
     Play = Play.sort_values(by="popularity", ascending=False)
     Play = Play[:5].reset_index()
     return Play['name'].tolist()
 
 # Function to recommend songs same as mood
 def Recommend_Songs_moods(pred_class, Music_Player):
-    if pred_class in ['Happy']:
+    if pred_class == 'Happy':
         Play = Music_Player[Music_Player['mood'].isin(['happy'])]
-    elif pred_class == 'Angry':
+    elif pred_class in ['Angry', 'Surprise']:
         Play = Music_Player[Music_Player['mood'] == 'energetic']
     elif pred_class in ['Sad', 'Fear']:
         Play = Music_Player[Music_Player['mood'] == 'sad']
-    elif pred_class in ['Surprise', 'Neutral']:
+    elif pred_class =='Neutral':
         Play = Music_Player[Music_Player['mood'] == 'calm']
     elif pred_class == 'Disgust':
-        Play = Music_Player[Music_Player['mood'] == 'sad']
+        Play = Music_Player[Music_Player['mood'].isin(['sad', 'calm'])]
     Play = Play.sort_values(by="popularity", ascending=False)
     Play = Play[:5].reset_index()
     return Play['name'].tolist()
@@ -245,14 +219,15 @@ def pred_and_recommend(image_file, class_names, playlist_name):
     img, img_base64 = load_and_prep_image(image_file)
     if img is None:
         print("Image preprocessing failed")
-        return None, None, None
+        return None, None, None, None
     pred = ResNet50V2_Model.predict(np.expand_dims(img, axis=0))
     pred_class = class_names[pred.argmax()]
     df = create_playlist_dataframe(playlist_name)
     df = predict_mood_for_tracks(df)
     songs = Recommend_Songs(pred_class, df)
     moody_songs = Recommend_Songs_moods(pred_class, df)
-    token = get_spotify_token()
+    token_info = session.get("token_info", None)
+    token = token_info["access_token"]
     song_links = []
     moody_song_links = []
     for song in songs:
@@ -267,41 +242,44 @@ def pred_and_recommend(image_file, class_names, playlist_name):
 @app.route('/', methods=['GET'])
 def index():
     return render_template('index.html')
-
+    
 @app.route('/check_auth', methods=['GET'])
 def check_auth():
-    if 'spotify_token' in session:
-        return jsonify({'authenticated': True})
-    else:
+    token_info = session.get("token_info", None)
+    if not token_info:
         return jsonify({'authenticated': False})
-    
+    if sp_oauth.is_token_expired(token_info):
+        token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
+        session['token_info'] = token_info
+    return jsonify({'authenticated': True})
+
+@app.route('/login')
+def login():
+    auth_url = sp_oauth.get_authorize_url()
+    session["token_info"] = sp_oauth.get_cached_token()
+    return redirect(auth_url)
+
+@app.route("/callback")
+def callback():
+    session.clear()
+    code = request.args.get('code')
+    session["token_info"] = sp_oauth.get_cached_token()
+    return redirect(url_for('index'))
+
 @app.route('/user_playlists', methods=['GET'])
 def user_playlists():
     refresh_spotify_token()
-    if 'spotify_token' in session:
-        sp = spotipy.Spotify(auth=session['spotify_token'])
+    token_info = session.get("token_info", None)
+    if not token_info:
+        return redirect("/login")
+    else:
+        sp = spotipy.Spotify(auth=token_info["access_token"])
         playlists = sp.current_user_playlists(limit=50)
         playlist_names = [playlist['name'] for playlist in playlists['items']]
-        return jsonify(playlist_names)
-    else:
-        return jsonify([])
-    
-@app.route('/login', methods=['POST'])
-def login():
-    username = request.form.get('username')
-    scope = request.form.get('scope')
-    redirect_uri = request.form.get('redirect_uri')
-    token = util.prompt_for_user_token(username, scope=scope,
-                                       client_id=SPOTIFY_CLIENT_ID,
-                                       client_secret=SPOTIFY_CLIENT_SECRET,
-                                       redirect_uri=redirect_uri)
-    
-    if token:
-        session['spotify_token'] = token
-        session['spotify_username'] = 'anetgirl'
-        return redirect('/')
-    else:
-        return 'Failed to authenticate with Spotify.'
+        if len(playlist_names) > 0:
+            return jsonify(playlist_names)
+        else:
+            return jsonify([])
 
 @app.route('/predict', methods=['POST'])
 def predict():

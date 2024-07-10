@@ -68,6 +68,28 @@
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
             transform: translateY(2px);
         }
+        .spotify-login-button {
+            background-color: #0b993d;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .spotify-login-button:hover {
+            background-color: #046121;
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .spotify-login-button:active {
+            background-color: #046121;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            transform: translateY(2px);
+        }
         #image-container {
             position: relative;
             margin: 20px auto;
@@ -175,12 +197,8 @@
 </head>
 <body>
     <h1>Emotion Based Song Recommendation</h1>
-     <!-- Hidden form for quick user authentication -->
-     <form id="loginForm" method="POST" action="/login">
-        <input type="hidden" name="username" id="spotifyUsername" value="anetgirl">
-        <input type="hidden" name="scope" value="playlist-read-private">
-        <input type="hidden" name="redirect_uri" value="http://localhost:8888/callback">
-    </form>
+    <!-- Add a login button to manually trigger Spotify login -->
+    <button id="loginButton" class="spotify-login-button">Login to Spotify</button>
     <form id="capture-form">
         <video id="video" width="600" height="400" autoplay></video>
         <button type="button" id="captureButton">Capture and Predict</button>
@@ -194,18 +212,27 @@
     <div id="songs-container"></div>
 
     <script>
-        // Code to automatically submit the login form on page load
+         // Code to automatically submit the login form on page load
         document.addEventListener('DOMContentLoaded', async function() {
             // Check if user is already authenticated
             const response = await fetch('/check_auth');
             const data = await response.json();
 
             if (!data.authenticated) {
-                // Submit the login form only if not authenticated
-                document.getElementById('loginForm').submit();
+                // Show the login button if not authenticated
+                document.getElementById('loginButton').style.display = 'block';
+            } else {
+                // Fetch user playlists after authentication
+                fetchUserPlaylists();
             }
+        }); 
 
-            // Fetch user playlists after authentication
+        document.getElementById('loginButton').addEventListener('click', function() {
+            // Redirect to the Spotify login page
+            window.location.href = '/login';
+        });
+
+        async function fetchUserPlaylists() {
             const playlistsResponse = await fetch('/user_playlists');
             const playlists = await playlistsResponse.json();
 
@@ -219,7 +246,7 @@
                     playlistDropdown.appendChild(option);
                 });
             }
-        });
+        }
 
         const video = document.getElementById('video');
         const captureButton = document.getElementById('captureButton');
@@ -250,6 +277,7 @@
                 // Get selected playlist from the dropdown
                 const playlistDropdown = document.getElementById('playlistDropdown');
                 const selectedPlaylist = playlistDropdown.value;
+
                 formData.append('playlist', selectedPlaylist);
 
                 const response = await fetch('/predict', {
@@ -258,76 +286,67 @@
                 });
 
                 if (response.ok) {
-                    const result = await response.json();
+                    const data = await response.json();
 
-                    if (!result.class) {
+                    if (!data.class) {
                         alert('No face detected, please try again.');
                         return;
                     }
+                    const { class: emotion, songs, songs_mood, image } = data;
 
-                    const img = document.createElement('img');
-                    img.src = 'data:image/jpeg;base64,' + result.image;
-                    img.alt = 'Captured Image';
+                    const imageElement = document.createElement('img');
+                    imageElement.src = 'data:image/png;base64,' + image;
+                    imageContainer.appendChild(imageElement);
 
-                    const predictedClassDiv = document.createElement('div');
-                    predictedClassDiv.id = 'predicted-class';
-                    predictedClassDiv.textContent = 'You are feeling: ' + result.class;
+                    const predictedClassElement = document.createElement('div');
+                    predictedClassElement.id = 'predicted-class';
+                    predictedClassElement.textContent = `Emotion: ${emotion}`;
+                    imageContainer.appendChild(predictedClassElement);
 
-                    imageContainer.appendChild(img);
-                    imageContainer.appendChild(predictedClassDiv);
+                    const songsListElement = document.createElement('ul');
+                    songs.forEach(song => {
+                        const listItem = document.createElement('li');
+                        const icon = document.createElement('img');
+                        icon.src = 'https://img.icons8.com/ios-filled/50/000000/musical-notes.png';
+                        icon.alt = 'Music Icon';
+                        listItem.appendChild(icon);
+                        const songLink = document.createElement('a');
+                        songLink.href = song.link;
+                        songLink.target = '_blank';
+                        songLink.textContent = song.title;
 
-                    if (result.songs && result.songs.length > 0) {
-                        const title = document.createElement('h2');
-                        title.textContent = 'Recommended Songs to boost your mood';
-                        songsContainer.appendChild(title);
+                        listItem.appendChild(songLink);
+                        songsListElement.appendChild(listItem);
+                    });
 
-                        const songsList = document.createElement('ul');
-                        result.songs.forEach(song => {
-                            const li = document.createElement('li');
-                            const icon = document.createElement('img');
-                            icon.src = 'https://img.icons8.com/ios-filled/50/000000/musical-notes.png';
-                            icon.alt = 'Music Icon';
-                            li.appendChild(icon);
-                            const link = document.createElement('a');
-                            link.href = song.link;
-                            link.target = '_blank';
-                            link.textContent = song.title;
-                            li.appendChild(link);
-                            songsList.appendChild(li);
-                        });
-                        songsContainer.appendChild(songsList);
-                    } else {
-                        const noSongsMessage = document.createElement('p');
-                        noSongsMessage.textContent = 'No songs to recommend';
-                        songsContainer.appendChild(noSongsMessage);
-                    }
-                    //Songs to match mood
-                    if (result.songs_mood && result.songs_mood.length > 0) {
-                        const title = document.createElement('h2');
-                        title.textContent = 'Recommended Songs to match your mood';
-                        songsContainer.appendChild(title);
+                    const moodySongsListElement = document.createElement('ul');
+                    songs_mood.forEach(song => {
+                        const listItem = document.createElement('li');
+                        const icon = document.createElement('img');
+                        icon.src = 'https://img.icons8.com/ios-filled/50/000000/musical-notes.png';
+                        icon.alt = 'Music Icon';
+                        listItem.appendChild(icon);
+                        const songLink = document.createElement('a');
+                        songLink.href = song.link;
+                        songLink.target = '_blank';
+                        songLink.textContent = song.title;
 
-                        const songsList = document.createElement('ul');
-                        result.songs_mood.forEach(song => {
-                            const li = document.createElement('li');
-                            const icon = document.createElement('img');
-                            icon.src = 'https://img.icons8.com/ios-filled/50/000000/musical-notes.png';
-                            icon.alt = 'Music Icon';
-                            li.appendChild(icon);
-                            const link = document.createElement('a');
-                            link.href = song.link;
-                            link.target = '_blank';
-                            link.textContent = song.title;
-                            li.appendChild(link);
-                            songsList.appendChild(li);
-                        });
-                        songsContainer.appendChild(songsList);
-                    } else {
-                        const noSongsMessage = document.createElement('p');
-                        noSongsMessage.textContent = 'No songs to recommend';
-                        songsContainer.appendChild(noSongsMessage);
-                    }
-                } else {
+                        listItem.appendChild(songLink);
+                        moodySongsListElement.appendChild(listItem);
+                    });
+
+                    const songsHeaderElement = document.createElement('h2');
+                    songsHeaderElement.textContent = 'Recommended Songs to boost your mood';
+
+                    const moodySongsHeaderElement = document.createElement('h2');
+                    moodySongsHeaderElement.textContent = 'Recommended Songs to match your mood';
+
+                    songsContainer.appendChild(songsHeaderElement);
+                    songsContainer.appendChild(songsListElement);
+                    songsContainer.appendChild(moodySongsHeaderElement);
+                    songsContainer.appendChild(moodySongsListElement);
+                }
+                else {
                     console.error('Failed to get response from /predict');
                 }
             }, 'image/jpeg');
