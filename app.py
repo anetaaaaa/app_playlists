@@ -44,10 +44,7 @@ reverse_mood_encoding = {
     3: 'sad'
 }
 
-# Set this to True for testing but you probaly want it set to False in production.
-SHOW_DIALOG = True
-
-# Function to search for songs on Spotify
+# Function to search for songs on Spotify based on client credentials token
 def search_spotify(song_name, token):
     search_url = 'https://api.spotify.com/v1/search'
     headers = {
