@@ -213,7 +213,7 @@
 
     <script>
          // Code to automatically submit the login form on page load
-        document.addEventListener('DOMContentLoaded', async function() {
+        /* document.addEventListener('DOMContentLoaded', async function() {
             // Check if user is already authenticated
             const response = await fetch('/check_auth');
             const data = await response.json();
@@ -225,7 +225,20 @@
                 // Fetch user playlists after authentication
                 fetchUserPlaylists();
             }
-        }); 
+        });  */
+
+        // Check if user is authenticated after they return from login
+        document.addEventListener('DOMContentLoaded', async function() {
+            const response = await fetch('/check_auth');
+            const data = await response.json();
+
+            if (data.authenticated) {
+                fetchUserPlaylists();
+            } else {
+                // Show the login button if not authenticated
+                window.location.href = '/login';
+            }
+        });
 
         document.getElementById('loginButton').addEventListener('click', function() {
             // Redirect to the Spotify login page
@@ -302,7 +315,7 @@
                     predictedClassElement.id = 'predicted-class';
                     predictedClassElement.textContent = `Emotion: ${emotion}`;
                     imageContainer.appendChild(predictedClassElement);
-
+                    
                     const songsListElement = document.createElement('ul');
                     songs.forEach(song => {
                         const listItem = document.createElement('li');
