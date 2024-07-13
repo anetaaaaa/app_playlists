@@ -2,5 +2,4 @@ config.py
 ResNet50V2_Model.h5
 .cache
 mood_model.h5
-__pycache__
-config.cpython-38.pyc
+__pycache__/
