@@ -2,5 +2,5 @@ config.py
 ResNet50V2_Model.h5
 pls_work.h5
 .cache
-.cache-anetgirl
 mood_model.h5
+__pycache__
