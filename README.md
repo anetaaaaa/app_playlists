@@ -24,3 +24,13 @@ python3 app.py
 It will start a webserver on http://127.0.0.1:5000. Use any web browser to open the web interface.
 
 Using the interface you can capture the screenshot from your webcam and see predicted emotion. You can choose your playlist from the dropdown menu. Two lists are displayed to either improve your emotional state or match your emotional state. Each list displays up to 5 songs. 
+
+<div align="center">
+<img src="scr1.png" height="400"/>
+</div>
+<div align="center">
+<img src="scr2.png" height="400"/>
+</div>
+<div align="center">
+<img src="scr3.jpg" height="400"/>
+</div>
