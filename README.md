@@ -29,8 +29,8 @@ Using the interface you can capture the screenshot from your webcam and see pred
 <img src="scr1.png" height="400"/>
 </div>
 <div align="center">
-<img src="scr2.png" height="400"/>
+<img src="scr2.png" height="300"/>
 </div>
 <div align="center">
-<img src="scr3.jpg" height="400"/>
+<img src="scr3.jpeg" height="400"/>
 </div>
